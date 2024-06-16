@@ -61,8 +61,23 @@ app.post("/project", async (req, res) => {
 });
 
 app.post("/deploy", async (req, res) => {
-  const { gitURL, slug } = req.body;
-  const projectSlug = slug ? slug : generateSlug();
+  const { projectId } = req.body;
+
+  const project = await prismaClient.project.findUnique({
+    where: {
+      id: projectId,
+    },
+  });
+
+  if (!project) return res.status(404).json({ error: "Project not found" });
+
+  const deployement = await prismaClient.deployement.create({
+    data: {
+      project: { connect: { id: projectId } },
+      status: "QUEUED",
+    },
+  });
+
   //Spin the container
   const command = new RunTaskCommand({
     cluster: config.CLUSTER,
@@ -81,8 +96,9 @@ app.post("/deploy", async (req, res) => {
         {
           name: "builder-image",
           environment: [
-            { name: "GIT_REPOSITORY__URL", value: gitURL },
-            { name: "PROJECT_ID", value: projectSlug },
+            { name: "GIT_REPOSITORY__URL", value: project.gitURL },
+            { name: "PROJECT_ID", value: projectId },
+            { id: "DEPLOYMENT_ID", value: deployement.id },
           ],
         },
       ],
