@@ -21,7 +21,9 @@ const DEPLOYMENT_ID = process.env.DEPLOYMENT_ID;
 const kafka = new Kafka({
   clientId: `docker-build-server-${DEPLOYMENT_ID}`,
   brokers: [],
-  ssl: {},
+  ssl: {
+    ca: [fs.readFileSync(path.join(__dirname, "kafka.pem"), "utf-8")],
+  },
   sasl: {
     username: "",
     password: "",
