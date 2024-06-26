@@ -1,4 +1,5 @@
-# RapidDeploy 
+<h1 align="center">RapidDeploy</h1>
+
 
 RapidDeploy is a deployment service that makes it easy to deploy React applications on AWS ECS Docker containers. It automates the setup, build, and deployment processes, and includes log streaming. This service simplifies deploying and running React apps at scale using good system design practices.
 
