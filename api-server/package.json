@@ -10,21 +10,12 @@
   "license": "ISC",
   "dependencies": {
     "@aws-sdk/client-ecs": "^3.592.0",
-    "@clickhouse/client": "^1.1.0",
-    "@prisma/client": "^5.15.0",
     "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "kafkajs": "^2.2.4",
+    "ioredis": "^5.4.1",
     "random-word-slugs": "^0.1.7",
-    "socket.io": "^4.7.5",
-    "uuid": "^10.0.0",
-    "zod": "^3.23.8"
-  },
-  "devDependencies": {
-    "@types/node": "^20.14.2",
-    "prisma": "^5.15.0",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.4.5"
+    "socket.io": "^4.7.5"
   },
   "description": ""
 }
