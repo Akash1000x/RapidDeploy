@@ -3,83 +3,80 @@ const path = require("path");
 const fs = require("fs");
 const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 const mime = require("mime-types");
-const { Kafka } = require("kafkajs");
+const Redis = require("ioredis");
 
-//TODO: add credentials here
+const publisher = new Redis(process.env.REDIS_URL);
+
 const s3Client = new S3Client({
-  region: "",
+  region: process.env.AWS_REGION,
   credentials: {
-    accessKeyId: "",
-    secretAccessKey: "",
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   },
 });
 
 const PROJECT_ID = process.env.PROJECT_ID;
-const DEPLOYMENT_ID = process.env.DEPLOYMENT_ID;
 
-//connect to kafka
-const kafka = new Kafka({
-  clientId: `docker-build-server-${DEPLOYMENT_ID}`,
-  brokers: [],
-  ssl: {
-    ca: [fs.readFileSync(path.join(__dirname, "kafka.pem"), "utf-8")],
-  },
-  sasl: {
-    username: "",
-    password: "",
-    mechanism: "plain",
-  },
-});
-
-const producer = kafka.producer();
-
-async function publishLOg(log) {
-  await producer.send({
-    topic: "container-logs",
-    messages: [{ key: "log", value: JSON.stringify({ PROJECT_ID, DEPLOYMENT_ID, log }) }],
-  });
+function publishLog(log) {
+  publisher.publish(`logs:${PROJECT_ID}`, JSON.stringify({ log }));
 }
 
 async function init() {
-  await producer.connect();
-
   console.log("Executing script.js");
+  publishLog("Build Started...");
   const outDirPath = path.join(__dirname, "output");
 
-  const p = exec(`cd ${outDirPath} && npm install && npm run build`);
+  const p = await exec(`cd ${outDirPath} && npm install && npm run build`);
 
-  p.stdout.on("error", async function (data) {
+  p.stdout.on("data", function (data) {
+    console.log(data.toString());
+    publishLog(data.toString());
+  });
+
+  p.stdout.on("error", function (data) {
     console.log("Error", data.toString());
-    await publishLOg(`error: ${data.toString()}`);
+    publishLog(`error: ${data.toString()}`);
   });
 
   p.on("close", async function () {
     console.log("Build Complete");
-    await publishLOg("Build Complete");
+    publishLog(`Build Complete`);
     const distFolderPath = path.join(__dirname, "output", "dist");
-    const distFolderContent = fs.readdirSync(distFolderPath, { recursive: true });
 
-    await publishLOg("Starting to upload");
-    for (const file of distFolderContent) {
+    // Check if the dist directory exists
+    if (!fs.existsSync(distFolderPath)) {
+      const errorMsg = `Error: dist directory does not exist at path ${distFolderPath}`;
+      console.log(errorMsg);
+      publishLog(errorMsg);
+      return;
+    }
+
+    console.log("distFolderPath", distFolderPath);
+    const distFolderContents = fs.readdirSync(distFolderPath, { recursive: true });
+
+    publishLog(`Starting to upload`);
+    console.log("Starting to upload");
+    for (const file of distFolderContents) {
       const filePath = path.join(distFolderPath, file);
       if (fs.lstatSync(filePath).isDirectory()) continue;
 
-      console.log("uploadin", filePath);
-      await publishLOg(`uploading ${file}`);
+      console.log("uploading", filePath);
+      publishLog(`uploading... ${file}`);
 
       const command = new PutObjectCommand({
-        Bucket: "",
+        Bucket: "rapid-deploy-website",
         Key: `__outputs/${PROJECT_ID}/${file}`,
         Body: fs.createReadStream(filePath),
         ContentType: mime.lookup(filePath),
       });
+
       await s3Client.send(command);
-      await publishLOg(`uploaded ${file}`);
-      await publishLOg("uploaded", filePath);
+      publishLog(`uploaded ${file}`);
+      console.log("uploaded", filePath);
     }
-    await publishLOg("Done");
+    publishLog("Done");
     console.log("Done...");
-    process.exit(0);
+    // process.exit(0);
   });
 }
 
