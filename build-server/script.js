@@ -64,7 +64,7 @@ async function init() {
       publishLog(`uploading... ${file}`);
 
       const command = new PutObjectCommand({
-        Bucket: "rapid-deploy-website",
+        Bucket: process.env.AWS_BUCKET_NAME,
         Key: `__outputs/${PROJECT_ID}/${file}`,
         Body: fs.createReadStream(filePath),
         ContentType: mime.lookup(filePath),
